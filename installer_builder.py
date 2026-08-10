@@ -1,178 +1,114 @@
-import sys
 import os
+import sys
 import urllib.request
 import zipfile
 import subprocess
 import shutil
-from PySide6.QtCore import Qt, QThread, Signal, Slot
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton, QMessageBox, QLineEdit
-)
-from PySide6.QtGui import QFont
+import tkinter as tk
+from tkinter import ttk, messagebox
+import threading
 
 DEFAULT_GITHUB_ZIP_URL = "https://github.com/AxisTechnologies/Image_format_converter/releases/latest/download/PNG2JPEGConverter_v1.0_Windows_Setup.zip"
-APP_NAME = "PNG → JPEG Auto-Converter"
+APP_NAME = "PNG -> JPEG Auto-Converter"
 INSTALL_DIR_NAME = "PNG2JPEGConverter"
 
-class DownloadThread(QThread):
-    progress_signal = Signal(int, int)
-    status_signal = Signal(str)
-    finished_signal = Signal(bool, str)
-
-    def __init__(self, download_url: str, dest_path: str, token: str = ""):
-        super().__init__()
-        self.download_url = download_url
-        self.dest_path = dest_path
-        self.token = token
-
-    def run(self):
-        try:
-            self.status_signal.emit("Connecting to GitHub release...")
-            req = urllib.request.Request(self.download_url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-            })
-            if self.token:
-                req.add_header("Authorization", f"token {self.token}")
-                req.add_header("Accept", "application/octet-stream")
-
-            with urllib.request.urlopen(req) as response:
-                total_size = int(response.headers.get('Content-Length', 0))
-                downloaded = 0
-                block_size = 8192
-
-                with open(self.dest_path, 'wb') as out_file:
-                    while True:
-                        buffer = response.read(block_size)
-                        if not buffer:
-                            break
-                        downloaded += len(buffer)
-                        out_file.write(buffer)
-                        self.progress_signal.emit(downloaded, total_size)
-
-            self.finished_signal.emit(True, self.dest_path)
-        except Exception as e:
-            self.finished_signal.emit(False, str(e))
-
-class InstallerWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle(f"{APP_NAME} Installer")
-        self.setFixedSize(520, 320)
+class UltraLightInstallerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title(f"{APP_NAME} Setup")
+        self.root.geometry("460x220")
+        self.root.resizable(False, False)
         
+        # Windows AppData Installation Target
         appdata_dir = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
         self.install_dir = os.path.join(appdata_dir, INSTALL_DIR_NAME)
-        self.temp_zip_path = os.path.join(os.environ.get("TEMP", "."), "png2jpeg_package.zip")
+        self.temp_zip_path = os.path.join(os.environ.get("TEMP", "."), "png2jpeg_pkg.zip")
 
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
-
-        title = QLabel(f"📦 Setup - {APP_NAME}")
-        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
-        layout.addWidget(title)
-
-        self.lbl_status = QLabel("Click 'Install' to setup application automatically on your PC.")
-        self.lbl_status.setWordWrap(True)
-        layout.addWidget(self.lbl_status)
-
-        # Personal Access Token input for Private Repositories (Optional)
-        token_lbl = QLabel("GitHub Personal Access Token (Required if repository is Private):")
-        token_lbl.setStyleSheet("color: #94A3B8; font-size: 11px;")
-        self.token_input = QLineEdit()
-        self.token_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.token_input.setPlaceholderText("ghp_xxxxxxxxxxxxxxxxxxxx (Leave empty for Public repo / offline setup)")
-        layout.addWidget(token_lbl)
-        layout.addWidget(self.token_input)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
-
-        self.btn_install = QPushButton("📥 Install Application")
-        self.btn_install.setStyleSheet("""
-            QPushButton {
-                background-color: #4F46E5;
-                color: #FFFFFF;
-                border-radius: 6px;
-                padding: 10px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton:hover { background-color: #4338CA; }
-        """)
-        self.btn_install.clicked.connect(self.start_installation)
-        layout.addWidget(self.btn_install)
-
-    def start_installation(self):
-        self.btn_install.setEnabled(False)
+        # Styling
+        self.root.configure(bg="#0F172A")
         
-        # Priority 1: Check embedded/local release zip package adjacent to installer
+        title_lbl = tk.Label(root, text=f"Setup - {APP_NAME}", font=("Segoe UI", 12, "bold"), fg="#F8FAFC", bg="#0F172A")
+        title_lbl.pack(anchor="w", padx=20, pady=(20, 5))
+
+        self.status_lbl = tk.Label(root, text="Click 'Install' to download & setup the application automatically.", font=("Segoe UI", 9), fg="#94A3B8", bg="#0F172A", wr=420, justify="left")
+        self.status_lbl.pack(anchor="w", padx=20, pady=(0, 15))
+
+        # Progress bar
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("TProgressbar", thickness=12, troughcolor='#1E293B', background='#4F46E5')
+        
+        self.progress = ttk.Progressbar(root, style="TProgressbar", orient="horizontal", length=420, mode="determinate")
+        self.progress.pack(padx=20, pady=(0, 20))
+
+        # Install button
+        self.install_btn = tk.Button(root, text="Install Application", font=("Segoe UI", 10, "bold"), fg="#FFFFFF", bg="#4F46E5", activebackground="#4338CA", activeforeground="#FFFFFF", bd=0, padx=20, pady=8, cursor="hand2", command=self.start_install_thread)
+        self.install_btn.pack(pady=(0, 15))
+
+    def start_install_thread(self):
+        self.install_btn.config(state="disabled")
+        threading.Thread(target=self.run_installation, daemon=True).start()
+
+    def update_status(self, text, val=None):
+        def _update():
+            self.status_lbl.config(text=text)
+            if val is not None:
+                self.progress['value'] = val
+        self.root.after(0, _update)
+
+    def run_installation(self):
+        # 1. Check local zip adjacent to installer
         installer_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         adjacent_zip = os.path.join(installer_dir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip")
         dist_zip = os.path.abspath(os.path.join("dist", "PNG2JPEGConverter_v1.0_Windows_Setup.zip"))
-        
+
         local_zip_path = None
         if os.path.exists(adjacent_zip):
             local_zip_path = adjacent_zip
         elif os.path.exists(dist_zip):
             local_zip_path = dist_zip
 
+        target_zip = self.temp_zip_path
+
         if local_zip_path:
-            self.lbl_status.setText("Installing application from local release package...")
-            self.progress_bar.setValue(50)
-            self.extract_and_create_shortcuts(local_zip_path)
-            return
+            self.update_status("Installing from local release package...", 50)
+            target_zip = local_zip_path
+        else:
+            self.update_status("Downloading application files from GitHub...", 10)
+            try:
+                req = urllib.request.Request(DEFAULT_GITHUB_ZIP_URL, headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                })
+                with urllib.request.urlopen(req) as resp, open(target_zip, 'wb') as out_f:
+                    total_size = int(resp.headers.get('Content-Length', 0))
+                    downloaded = 0
+                    block_size = 8192
+                    while True:
+                        buf = resp.read(block_size)
+                        if not buf:
+                            break
+                        downloaded += len(buf)
+                        out_f.write(buf)
+                        if total_size > 0:
+                            pct = int((downloaded / total_size) * 60) + 10
+                            self.update_status(f"Downloading... {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB", pct)
+            except Exception as e:
+                self.update_status(f"Download Error: {e}")
+                self.root.after(0, lambda: messagebox.showerror("Download Error", f"Failed to download package from GitHub:\n{e}\n\nPlease ensure the GitHub Release is published as Public."))
+                self.root.after(0, lambda: self.install_btn.config(state="normal"))
+                return
 
-        # Priority 2: Web download from GitHub Releases
-        token = self.token_input.text().strip()
-        self.download_thread = DownloadThread(DEFAULT_GITHUB_ZIP_URL, self.temp_zip_path, token=token)
-        self.download_thread.progress_signal.connect(self.update_progress)
-        self.download_thread.status_signal.connect(self.lbl_status.setText)
-        self.download_thread.finished_signal.connect(self.on_download_finished)
-        self.download_thread.start()
-
-    @Slot(int, int)
-    def update_progress(self, downloaded, total):
-        if total > 0:
-            percent = int((downloaded / total) * 100)
-            self.progress_bar.setValue(percent)
-            self.lbl_status.setText(f"Downloading files... {percent}% ({downloaded // (1024*1024)}MB / {total // (1024*1024)}MB)")
-
-    @Slot(bool, str)
-    def on_download_finished(self, success, result_or_err):
-        if not success:
-            err_text = str(result_or_err)
-            if "404" in err_text:
-                msg = ("GitHub download link returned 404 Not Found.\n\n"
-                       "If 'AxisTechnologies/Image_format_converter' is a PRIVATE repository, please:\n"
-                       "1. Make the repository PUBLIC or publish a Release on GitHub.\n"
-                       "2. OR enter a GitHub Personal Access Token in the installer token box.\n"
-                       "3. OR place 'PNG2JPEGConverter_v1.0_Windows_Setup.zip' in the same folder as this installer.")
-            else:
-                msg = f"Failed to download package from GitHub:\n{result_or_err}"
-
-            QMessageBox.critical(self, "Download Error", msg)
-            self.btn_install.setEnabled(True)
-            return
-
-        self.extract_and_create_shortcuts(self.temp_zip_path)
-
-    def extract_and_create_shortcuts(self, zip_file_path: str):
+        # 2. Extract files
         try:
-            self.lbl_status.setText("Extracting application files...")
+            self.update_status("Extracting files...", 80)
             os.makedirs(self.install_dir, exist_ok=True)
-
-            with zipfile.ZipFile(zip_file_path, "r") as z:
+            with zipfile.ZipFile(target_zip, 'r') as z:
                 z.extractall(self.install_dir)
 
             exe_target = os.path.join(self.install_dir, "PNG2JPEGConverter.exe")
 
-            # Create Desktop Shortcut via VBScript
-            self.lbl_status.setText("Creating Desktop shortcut...")
+            # 3. Create Desktop Shortcut
+            self.update_status("Creating Desktop shortcut...", 90)
             desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
             shortcut_path = os.path.join(desktop_dir, "PNG2JPEG Auto-Converter.lnk")
 
@@ -187,33 +123,27 @@ class InstallerWindow(QWidget):
             vbs_file = os.path.join(os.environ.get("TEMP", "."), "create_shortcut.vbs")
             with open(vbs_file, "w", encoding="utf-8") as f:
                 f.write(vbs_script)
-
             subprocess.run(["cscript", "//Nologo", vbs_file], check=True)
 
-            self.progress_bar.setValue(100)
-            self.lbl_status.setText("✅ Installation Complete!")
+            self.update_status("✅ Installation Complete!", 100)
 
-            reply = QMessageBox.information(
-                self,
-                "Installation Successful",
-                f"{APP_NAME} has been installed successfully!\n\nLocation: {self.install_dir}\n\nA Desktop shortcut has been created.\nWould you like to run it now?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
+            def _prompt_success():
+                ans = messagebox.askyesno("Installation Complete", f"{APP_NAME} installed successfully!\n\nA Desktop shortcut has been created.\n\nWould you like to run the application now?")
+                if ans:
+                    subprocess.Popen([exe_target], cwd=self.install_dir)
+                self.root.destroy()
 
-            if reply == QMessageBox.StandardButton.Yes:
-                subprocess.Popen([exe_target], cwd=self.install_dir)
-
-            self.close()
+            self.root.after(0, _prompt_success)
 
         except Exception as e:
-            QMessageBox.critical(self, "Installation Error", f"Failed installing files: {e}")
-            self.btn_install.setEnabled(True)
+            self.update_status(f"Installation Error: {e}")
+            self.root.after(0, lambda: messagebox.showerror("Installation Error", f"Failed to install files:\n{e}"))
+            self.root.after(0, lambda: self.install_btn.config(state="normal"))
 
 def main():
-    app = QApplication(sys.argv)
-    window = InstallerWindow()
-    window.show()
-    sys.exit(app.exec())
+    root = tk.Tk()
+    app = UltraLightInstallerApp(root)
+    root.mainloop()
 
 if __name__ == "__main__":
     main()
