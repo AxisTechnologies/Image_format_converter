@@ -18,7 +18,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "maintain_aspect_ratio": True,
     "transparency_color": "White",  # "White", "Black", "Custom"
     "custom_color_hex": "#FFFFFF",
-    "existing_file_policy": "Skip",  # "Skip", "Replace", "Create Numbered Copy"
+    "existing_file_policy": "Create Numbered Copy",  # "Create Numbered Copy", "Skip", "Replace"
     "process_existing_on_startup": True,
     "include_subfolders": False,
     "preserve_subfolder_structure": True,

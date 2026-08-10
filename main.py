@@ -332,7 +332,7 @@ class MainWindow(QMainWindow):
 
         existing_title = QLabel("Existing File Policy:")
         self.existing_combo = QComboBox()
-        self.existing_combo.addItems(["Skip", "Replace", "Create Numbered Copy"])
+        self.existing_combo.addItems(["Create Numbered Copy (_1, _2)", "Skip Existing", "Replace Existing"])
 
         policy_layout.addWidget(bg_title)
         policy_layout.addWidget(self.bg_combo)
@@ -495,10 +495,16 @@ class MainWindow(QMainWindow):
             self.bg_combo.setCurrentIndex(bg_idx)
         self.selected_color_hex = self.config.get("custom_color_hex", "#FFFFFF")
 
-        exist_val = self.config.get("existing_file_policy", "Skip")
-        ex_idx = self.existing_combo.findText(exist_val)
-        if ex_idx >= 0:
-            self.existing_combo.setCurrentIndex(ex_idx)
+        exist_val = self.config.get("existing_file_policy", "Create Numbered Copy")
+        if exist_val == "Create Numbered Copy":
+            ex_idx = 0
+        elif exist_val == "Skip":
+            ex_idx = 1
+        elif exist_val == "Replace":
+            ex_idx = 2
+        else:
+            ex_idx = 0
+        self.existing_combo.setCurrentIndex(ex_idx)
 
         self.startup_scan_cb.setChecked(self.config.get("process_existing_on_startup", True))
         self.subfolders_cb.setChecked(self.config.get("include_subfolders", False))
@@ -506,6 +512,16 @@ class MainWindow(QMainWindow):
         self.minimized_cb.setChecked(self.config.get("start_minimized", False))
 
     def collect_settings_from_ui(self) -> dict:
+        combo_text = self.existing_combo.currentText()
+        if "Numbered" in combo_text:
+            policy_val = "Create Numbered Copy"
+        elif "Skip" in combo_text:
+            policy_val = "Skip"
+        elif "Replace" in combo_text:
+            policy_val = "Replace"
+        else:
+            policy_val = "Create Numbered Copy"
+
         return {
             "source_folder": self.target_input.text().strip(),
             "output_folder": self.output_input.text().strip(),
@@ -519,7 +535,7 @@ class MainWindow(QMainWindow):
             "maintain_aspect_ratio": self.aspect_cb.isChecked(),
             "transparency_color": self.bg_combo.currentText(),
             "custom_color_hex": self.selected_color_hex,
-            "existing_file_policy": self.existing_combo.currentText(),
+            "existing_file_policy": policy_val,
             "process_existing_on_startup": self.startup_scan_cb.isChecked(),
             "include_subfolders": self.subfolders_cb.isChecked(),
             "preserve_subfolder_structure": True,

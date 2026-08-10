@@ -126,22 +126,13 @@ class ConversionManager(QObject):
         if not source_path or ext not in allowed:
             return
 
-        if self.tracker.is_processed(source_path):
-            logger.debug(f"Skipping already processed file: {source_path}")
-            self.stats["skipped"] += 1
-            self.stats["processed"] += 1
-            self.conversion_skipped.emit(source_path, "Already processed")
-            self.stats_updated.emit(self.stats)
-            return
-
         out_path, action = self.determine_output_path(source_path)
         
         if action == "skip":
             logger.info(f"Skipping existing output file: {out_path}")
-            self.tracker.mark_processed(source_path)
             self.stats["skipped"] += 1
             self.stats["processed"] += 1
-            self.conversion_skipped.emit(source_path, "Output image file already exists")
+            self.conversion_skipped.emit(source_path, "Output image file already exists in destination folder")
             self.stats_updated.emit(self.stats)
             return
 
@@ -149,7 +140,6 @@ class ConversionManager(QObject):
 
         try:
             res_path = ImageConverter.convert_image(source_path, out_path, self.settings)
-            self.tracker.mark_processed(source_path)
             self.stats["success"] += 1
             self.stats["processed"] += 1
             self.conversion_success.emit(source_path, res_path)
