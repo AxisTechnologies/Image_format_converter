@@ -136,14 +136,44 @@ namespace PNG2JPEGConverterInstaller
                         }
                     }
 
-                    UpdateStatus("Extracting files...", 80);
-                    if (Directory.Exists(installDir))
+                    // Terminate active instances before extracting updates
+                    try
                     {
-                        Directory.Delete(installDir, true);
+                        foreach (Process proc in Process.GetProcessesByName("PNG2JPEGConverter"))
+                        {
+                            proc.Kill();
+                            proc.WaitForExit(1000);
+                        }
                     }
-                    Directory.CreateDirectory(installDir);
+                    catch { }
 
-                    ZipFile.ExtractToDirectory(targetZip, installDir);
+                    UpdateStatus("Extracting files...", 80);
+                    if (!Directory.Exists(installDir))
+                    {
+                        Directory.CreateDirectory(installDir);
+                    }
+
+                    // Extract and overwrite files cleanly
+                    using (ZipArchive archive = ZipFile.OpenRead(targetZip))
+                    {
+                        foreach (ZipArchiveEntry entry in archive.Entries)
+                        {
+                            string destinationPath = Path.Combine(installDir, entry.FullName);
+                            if (string.IsNullOrEmpty(entry.Name))
+                            {
+                                Directory.CreateDirectory(destinationPath);
+                            }
+                            else
+                            {
+                                string parentDir = Path.GetDirectoryName(destinationPath);
+                                if (!Directory.Exists(parentDir))
+                                {
+                                    Directory.CreateDirectory(parentDir);
+                                }
+                                entry.ExtractToFile(destinationPath, true);
+                            }
+                        }
+                    }
 
                     UpdateStatus("Creating Desktop shortcut...", 95);
                     string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
