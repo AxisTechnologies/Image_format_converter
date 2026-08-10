@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.manifest
+*.spec
+
+# PyInstaller
+#  Usually these files are written by a PyInstaller build process
+*.manifest
+*.spec
+
+# Virtual environment
+venv/
+ENV/
+env/
+
+# Test sandboxes
+sandbox_test/
+sandbox_multiformat/
+
+# Local settings / tracker runtime history
+tracker_history.json
+settings.json
+*.log
