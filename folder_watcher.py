@@ -40,7 +40,7 @@ def wait_for_file_stability(
 
 
 class ImageFolderHandler(FileSystemEventHandler):
-    """Watchdog event handler filtering for allowed image extensions and triggering stability check."""
+    """Watchdog event handler filtering for allowed image extensions and triggering callback."""
 
     def __init__(self, callback: Callable[[str], None], allowed_exts: Optional[list] = None, include_subfolders: bool = False):
         super().__init__()
@@ -48,23 +48,23 @@ class ImageFolderHandler(FileSystemEventHandler):
         self.include_subfolders = include_subfolders
         self.allowed_exts = [e.lower() for e in (allowed_exts or [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".avif"])]
 
-    def _process_event(self, event):
+    def _process_event(self, event, is_move: bool = False):
         if event.is_directory:
             return
         
-        filepath = event.src_path
+        filepath = event.dest_path if is_move else event.src_path
         ext = os.path.splitext(filepath)[1].lower()
         if ext in self.allowed_exts:
-            if wait_for_file_stability(filepath):
-                self.callback(filepath)
-            else:
-                logger.warning(f"File stability check failed for: {filepath}")
+            self.callback(filepath)
 
     def on_created(self, event):
         self._process_event(event)
 
     def on_modified(self, event):
         self._process_event(event)
+
+    def on_moved(self, event):
+        self._process_event(event, is_move=True)
 
 
 class FolderWatcherService:

@@ -56,20 +56,42 @@ Continuous real-time image converter application for Windows 10 & 11.
 
 print(f" -> Release ZIP created: {zip_output} ({os.path.getsize(zip_output) / (1024*1024):.2f} MB)")
 
-# 3. Build One-Click Web Installer Executable
-print("\n[STEP 3] Building One-Click Web Setup Installer...")
-cmd2 = [
+# 3. Build 100% Self-Contained Standalone Offline Windows Setup Installer
+print("\n[STEP 3] Building 100% Self-Contained Standalone Offline Setup Installer...")
+installer_exe = os.path.join(dist_dir, "PNG2JPEGConverter_Installer.exe")
+cmd3 = [
     venv_pyinstaller,
     "--noconfirm",
     "--onefile",
     "--windowed",
-    "--name", "PNG2JPEGConverter_Web_Setup",
+    "--add-data", f"{zip_output};.",
+    "--name", "PNG2JPEGConverter_Installer",
     "installer_builder.py"
 ]
-subprocess.run(cmd2, check=True, cwd=base_dir)
+subprocess.run(cmd3, check=True, cwd=base_dir)
+
+# 4. Build Native 12 KB Web Installer (Optional Helper)
+print("\n[STEP 4] Compiling Native 12 KB Windows Setup Installer...")
+csc_path = r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+native_exe = os.path.join(dist_dir, "PNG2JPEGConverter_Setup.exe")
+
+if os.path.exists(csc_path):
+    cmd4 = [
+        csc_path,
+        "/target:winexe",
+        f"/out:{native_exe}",
+        "/reference:System.Windows.Forms.dll",
+        "/reference:System.Drawing.dll",
+        "/reference:System.IO.Compression.dll",
+        "/reference:System.IO.Compression.FileSystem.dll",
+        "installer_native.cs"
+    ]
+    subprocess.run(cmd4, check=True, cwd=base_dir)
 
 print("\n==========================================================")
 print(" BUILD SUCCESSFUL!")
-print(f" Installer: {os.path.join(dist_dir, 'PNG2JPEGConverter_Web_Setup.exe')}")
-print(f" Release Zip: {zip_output}")
+print(f" Standalone Offline Installer: {installer_exe} ({os.path.getsize(installer_exe) / (1024*1024):.2f} MB)")
+print(f" Standalone Portable App: {portable_exe} ({os.path.getsize(portable_exe) / (1024*1024):.2f} MB)")
+if os.path.exists(native_exe):
+    print(f" Native Web Installer: {native_exe} ({os.path.getsize(native_exe) / 1024:.2f} KB)")
 print("==========================================================")

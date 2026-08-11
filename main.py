@@ -2,6 +2,7 @@ import sys
 import os
 import logging
 from PySide6.QtCore import Qt, QSize, Slot
+from PySide6.QtCore import Qt, QSize, Slot, QTimer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QSlider, QComboBox, QCheckBox, QSpinBox,
@@ -168,9 +169,32 @@ class MainWindow(QMainWindow):
         self.conversion_mgr.conversion_failed.connect(self.log_failed)
         self.conversion_mgr.stats_updated.connect(self.update_stats_ui)
 
+        # Periodic Poll Timer (fallback scanning)
+        self.poll_timer = QTimer(self)
+        self.poll_timer.setInterval(3000)
+        self.poll_timer.timeout.connect(self.periodic_poll_check)
+
         self.init_ui()
         self.init_system_tray()
         self.apply_stored_config()
+
+        self.setAcceptDrops(True)
+
+        self.init_ui()
+        self.init_system_tray()
+        self.apply_stored_config()
+
+        # Connect UI controls to auto-sync settings in real-time
+        self.format_combo.currentIndexChanged.connect(self.auto_sync_settings)
+        self.quality_slider.valueChanged.connect(self.auto_sync_settings)
+        self.size_combo.currentIndexChanged.connect(self.auto_sync_settings)
+        self.percent_spin.valueChanged.connect(self.auto_sync_settings)
+        self.width_spin.valueChanged.connect(self.auto_sync_settings)
+        self.height_spin.valueChanged.connect(self.auto_sync_settings)
+        self.aspect_cb.toggled.connect(self.auto_sync_settings)
+        self.bg_combo.currentIndexChanged.connect(self.auto_sync_settings)
+        self.existing_combo.currentIndexChanged.connect(self.auto_sync_settings)
+        self.subfolders_cb.toggled.connect(self.on_subfolders_toggled)
 
         # Start conversion manager thread pool
         self.conversion_mgr.start()
@@ -378,12 +402,17 @@ class MainWindow(QMainWindow):
         card_layout.addWidget(self.lbl_failed)
         card_layout.addStretch()
 
+        self.convert_files_btn = QPushButton("📂 Convert File(s)...")
+        self.convert_files_btn.setObjectName("secondaryBtn")
+        self.convert_files_btn.clicked.connect(self.convert_manual_files)
+
         self.toggle_btn = QPushButton("▶ Start Monitoring")
         self.toggle_btn.clicked.connect(self.toggle_monitoring)
         self.save_btn = QPushButton("Save Settings")
         self.save_btn.setObjectName("secondaryBtn")
         self.save_btn.clicked.connect(self.save_current_settings)
 
+        card_layout.addWidget(self.convert_files_btn)
         card_layout.addWidget(self.toggle_btn)
         card_layout.addWidget(self.save_btn)
         main_layout.addWidget(card_frame)
@@ -638,11 +667,13 @@ class MainWindow(QMainWindow):
             self.toggle_btn.setObjectName("dangerBtn")
             self.toggle_btn.setStyle(self.toggle_btn.style())
             self.tray_toggle_action.setText("Pause Monitoring")
+            self.poll_timer.start()
 
             if settings["process_existing_on_startup"]:
                 self.conversion_mgr.scan_folder_and_enqueue(src, recursive=recursive)
 
     def stop_monitoring(self):
+        self.poll_timer.stop()
         self.watcher.stop_monitoring()
         self.status_badge.setText("● PAUSED")
         self.status_badge.setStyleSheet("color: #F59E0B; font-weight: bold; background: #3B270C; padding: 4px 10px; border-radius: 12px;")
@@ -650,6 +681,76 @@ class MainWindow(QMainWindow):
         self.toggle_btn.setObjectName("")
         self.toggle_btn.setStyle(self.toggle_btn.style())
         self.tray_toggle_action.setText("Resume Monitoring")
+
+    def auto_sync_settings(self):
+        settings = self.collect_settings_from_ui()
+        self.conversion_mgr.update_settings(settings)
+
+    def on_subfolders_toggled(self, checked: bool):
+        self.auto_sync_settings()
+        if self.watcher.is_monitoring:
+            src = self.target_input.text().strip()
+            allowed = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".avif"]
+            self.watcher.start_monitoring(src, allowed_exts=allowed, include_subfolders=checked)
+
+    def periodic_poll_check(self):
+        if self.watcher.is_monitoring:
+            settings = self.collect_settings_from_ui()
+            self.conversion_mgr.update_settings(settings)
+            src = settings.get("source_folder", "")
+            recursive = settings.get("include_subfolders", False)
+            if src and os.path.exists(src):
+                self.conversion_mgr.scan_folder_and_enqueue(src, recursive=recursive)
+
+    def convert_manual_files(self):
+        out_folder = self.output_input.text().strip()
+        if not out_folder:
+            QMessageBox.warning(self, "Output Folder Required", "Please select an Output Folder destination first before selecting files.")
+            return
+
+        os.makedirs(out_folder, exist_ok=True)
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Image Files to Convert",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.webp *.bmp *.tiff *.tif *.avif);;All Files (*)"
+        )
+
+        if files:
+            settings = self.collect_settings_from_ui()
+            self.config.update_dict(settings)
+            self.conversion_mgr.update_settings(settings)
+            for f in files:
+                self.conversion_mgr.enqueue_file(f, force=True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if not urls:
+            return
+        
+        out_folder = self.output_input.text().strip()
+        if not out_folder:
+            QMessageBox.warning(self, "Output Folder Required", "Please select an Output Folder destination first before dropping files.")
+            return
+
+        os.makedirs(out_folder, exist_ok=True)
+        settings = self.collect_settings_from_ui()
+        self.config.update_dict(settings)
+        self.conversion_mgr.update_settings(settings)
+
+        allowed = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".avif"]
+        count = 0
+        for url in urls:
+            local_path = url.toLocalFile()
+            if os.path.isfile(local_path) and os.path.splitext(local_path)[1].lower() in allowed:
+                self.conversion_mgr.enqueue_file(local_path, force=True)
+                count += 1
+            elif os.path.isdir(local_path):
+                self.conversion_mgr.scan_folder_and_enqueue(local_path, recursive=self.subfolders_cb.isChecked(), force=True)
 
     def trigger_manual_scan(self):
         if self.validate_folders():

@@ -111,9 +111,10 @@ namespace PNG2JPEGConverterInstaller
             {
                 try
                 {
-                    // Priority 1: Check local release zip adjacent to installer executable
+                    // Priority 1: Check local release zip adjacent to installer executable or in dist
                     string exeDir = AppDomain.CurrentDomain.BaseDirectory;
                     string localZip = Path.Combine(exeDir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip");
+                    string distZip = Path.Combine(exeDir, "dist", "PNG2JPEGConverter_v1.0_Windows_Setup.zip");
                     string targetZip = tempZipPath;
 
                     if (File.Exists(localZip))
@@ -121,18 +122,31 @@ namespace PNG2JPEGConverterInstaller
                         UpdateStatus("Installing from local package...", 50);
                         targetZip = localZip;
                     }
+                    else if (File.Exists(distZip))
+                    {
+                        UpdateStatus("Installing from local dist package...", 50);
+                        targetZip = distZip;
+                    }
                     else
                     {
                         UpdateStatus("Downloading application package from GitHub...", 10);
-                        using (WebClient wc = new WebClient())
+                        try
                         {
-                            wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-                            wc.DownloadProgressChanged += (s, ev) =>
+                            using (WebClient wc = new WebClient())
                             {
-                                int pct = 10 + (int)(ev.ProgressPercentage * 0.6);
-                                UpdateStatus(String.Format("Downloading... {0}MB / {1}MB", ev.BytesReceived / (1024 * 1024), ev.TotalBytesToReceive / (1024 * 1024)), pct);
-                            };
-                            wc.DownloadFileTaskAsync(new Uri(DownloadUrl), targetZip).Wait();
+                                wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+                                wc.DownloadProgressChanged += (s, ev) =>
+                                {
+                                    int pct = 10 + (int)(ev.ProgressPercentage * 0.6);
+                                    UpdateStatus(String.Format("Downloading... {0}MB / {1}MB", ev.BytesReceived / (1024 * 1024), ev.TotalBytesToReceive / (1024 * 1024)), pct);
+                                };
+                                wc.DownloadFileTaskAsync(new Uri(DownloadUrl), targetZip).Wait();
+                            }
+                        }
+                        catch (Exception dlEx)
+                        {
+                            Exception inner = dlEx.InnerException ?? dlEx;
+                            throw new Exception("Could not download package from GitHub:\n" + inner.Message + "\n\nNote: Please publish the GitHub Release 'v1.0' on your GitHub repository, or keep 'PNG2JPEGConverter_v1.0_Windows_Setup.zip' in the same folder as this setup installer.");
                         }
                     }
 

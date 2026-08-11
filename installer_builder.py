@@ -57,57 +57,63 @@ class UltraLightInstallerApp:
         self.root.after(0, _update)
 
     def run_installation(self):
-        # 1. Check local zip adjacent to installer
-        installer_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        adjacent_zip = os.path.join(installer_dir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip")
-        dist_zip = os.path.abspath(os.path.join("dist", "PNG2JPEGConverter_v1.0_Windows_Setup.zip"))
-
-        local_zip_path = None
-        if os.path.exists(adjacent_zip):
-            local_zip_path = adjacent_zip
-        elif os.path.exists(dist_zip):
-            local_zip_path = dist_zip
-
-        target_zip = self.temp_zip_path
-
-        if local_zip_path:
-            self.update_status("Installing from local release package...", 50)
-            target_zip = local_zip_path
-        else:
-            self.update_status("Downloading application files from GitHub...", 10)
-            try:
-                req = urllib.request.Request(DEFAULT_GITHUB_ZIP_URL, headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                })
-                with urllib.request.urlopen(req) as resp, open(target_zip, 'wb') as out_f:
-                    total_size = int(resp.headers.get('Content-Length', 0))
-                    downloaded = 0
-                    block_size = 8192
-                    while True:
-                        buf = resp.read(block_size)
-                        if not buf:
-                            break
-                        downloaded += len(buf)
-                        out_f.write(buf)
-                        if total_size > 0:
-                            pct = int((downloaded / total_size) * 60) + 10
-                            self.update_status(f"Downloading... {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB", pct)
-            except Exception as e:
-                self.update_status(f"Download Error: {e}")
-                self.root.after(0, lambda: messagebox.showerror("Download Error", f"Failed to download package from GitHub:\n{e}\n\nPlease ensure the GitHub Release is published as Public."))
-                self.root.after(0, lambda: self.install_btn.config(state="normal"))
-                return
-
-        # 2. Extract files
         try:
-            self.update_status("Extracting files...", 80)
-            os.makedirs(self.install_dir, exist_ok=True)
-            with zipfile.ZipFile(target_zip, 'r') as z:
-                z.extractall(self.install_dir)
+            # Priority 1: Check for embedded application payload inside installer bundle
+            bundle_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            embedded_exe = os.path.join(bundle_dir, "PNG2JPEGConverter.exe")
+            embedded_zip = os.path.join(bundle_dir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip")
 
+            os.makedirs(self.install_dir, exist_ok=True)
             exe_target = os.path.join(self.install_dir, "PNG2JPEGConverter.exe")
 
-            # 3. Create Desktop Shortcut
+            if os.path.exists(embedded_exe):
+                self.update_status("Installing application files...", 50)
+                shutil.copy2(embedded_exe, exe_target)
+            elif os.path.exists(embedded_zip):
+                self.update_status("Extracting embedded package...", 50)
+                with zipfile.ZipFile(embedded_zip, 'r') as z:
+                    z.extractall(self.install_dir)
+            else:
+                # Check local adjacent zip or download from web
+                installer_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+                adjacent_zip = os.path.join(installer_dir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip")
+                dist_zip = os.path.abspath(os.path.join("dist", "PNG2JPEGConverter_v1.0_Windows_Setup.zip"))
+
+                local_zip_path = None
+                if os.path.exists(adjacent_zip):
+                    local_zip_path = adjacent_zip
+                elif os.path.exists(dist_zip):
+                    local_zip_path = dist_zip
+
+                target_zip = self.temp_zip_path
+
+                if local_zip_path:
+                    self.update_status("Installing from local release package...", 50)
+                    target_zip = local_zip_path
+                else:
+                    self.update_status("Downloading application files from GitHub...", 10)
+                    req = urllib.request.Request(DEFAULT_GITHUB_ZIP_URL, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                    })
+                    with urllib.request.urlopen(req) as resp, open(target_zip, 'wb') as out_f:
+                        total_size = int(resp.headers.get('Content-Length', 0))
+                        downloaded = 0
+                        block_size = 8192
+                        while True:
+                            buf = resp.read(block_size)
+                            if not buf:
+                                break
+                            downloaded += len(buf)
+                            out_f.write(buf)
+                            if total_size > 0:
+                                pct = int((downloaded / total_size) * 60) + 10
+                                self.update_status(f"Downloading... {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB", pct)
+
+                self.update_status("Extracting files...", 80)
+                with zipfile.ZipFile(target_zip, 'r') as z:
+                    z.extractall(self.install_dir)
+
+            # Create Desktop Shortcut
             self.update_status("Creating Desktop shortcut...", 90)
             desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
             shortcut_path = os.path.join(desktop_dir, "PNG2JPEG Auto-Converter.lnk")
