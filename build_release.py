@@ -1,5 +1,5 @@
-# PNG -> JPEG Auto-Converter Windows Release & Web Installer Build Script
-# Run this script to generate both offline setup ZIP and GitHub Web setup installer
+# PNG -> JPEG Auto-Converter Windows Release & Installer Build Script
+# Run this script to generate the self-contained offline Windows installer
 
 import os
 import sys
@@ -19,7 +19,7 @@ dist_dir = os.path.join(base_dir, "dist")
 build_dir = os.path.join(base_dir, "build")
 
 # 1. Build Standalone Portable Executable
-print("\n[STEP 1] Building standalone portable executable...")
+print("\n[STEP 1] Building standalone application package...")
 cmd1 = [
     venv_pyinstaller,
     "--noconfirm",
@@ -40,8 +40,8 @@ cmd1 = [
 ]
 subprocess.run(cmd1, check=True, cwd=base_dir)
 
-# 2. Package Release ZIP for GitHub Releases
-print("\n[STEP 2] Packaging release ZIP for GitHub Releases...")
+# 2. Package Release ZIP
+print("\n[STEP 2] Packaging application ZIP...")
 portable_exe = os.path.join(dist_dir, "PNG2JPEGConverter_Portable.exe")
 zip_output = os.path.join(dist_dir, "PNG2JPEGConverter_v1.0_Windows_Setup.zip")
 
@@ -54,9 +54,9 @@ Continuous real-time image converter application for Windows 10 & 11.
 """
     z.writestr("README.txt", readme)
 
-print(f" -> Release ZIP created: {zip_output} ({os.path.getsize(zip_output) / (1024*1024):.2f} MB)")
+print(f" -> Zip created: {zip_output} ({os.path.getsize(zip_output) / (1024*1024):.2f} MB)")
 
-# 3. Build 100% Self-Contained Standalone Offline Windows Setup Installer
+# 3. Build 100% Self-Contained Standalone Offline Setup Installer
 print("\n[STEP 3] Building 100% Self-Contained Standalone Offline Setup Installer...")
 installer_exe = os.path.join(dist_dir, "PNG2JPEGConverter_Installer.exe")
 cmd3 = [
@@ -70,28 +70,13 @@ cmd3 = [
 ]
 subprocess.run(cmd3, check=True, cwd=base_dir)
 
-# 4. Build Native 12 KB Web Installer (Optional Helper)
-print("\n[STEP 4] Compiling Native 12 KB Windows Setup Installer...")
-csc_path = r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-native_exe = os.path.join(dist_dir, "PNG2JPEGConverter_Setup.exe")
-
-if os.path.exists(csc_path):
-    cmd4 = [
-        csc_path,
-        "/target:winexe",
-        f"/out:{native_exe}",
-        "/reference:System.Windows.Forms.dll",
-        "/reference:System.Drawing.dll",
-        "/reference:System.IO.Compression.dll",
-        "/reference:System.IO.Compression.FileSystem.dll",
-        "installer_native.cs"
-    ]
-    subprocess.run(cmd4, check=True, cwd=base_dir)
+# Cleanup temporary intermediate files in dist
+if os.path.exists(portable_exe):
+    os.remove(portable_exe)
+if os.path.exists(zip_output):
+    os.remove(zip_output)
 
 print("\n==========================================================")
 print(" BUILD SUCCESSFUL!")
 print(f" Standalone Offline Installer: {installer_exe} ({os.path.getsize(installer_exe) / (1024*1024):.2f} MB)")
-print(f" Standalone Portable App: {portable_exe} ({os.path.getsize(portable_exe) / (1024*1024):.2f} MB)")
-if os.path.exists(native_exe):
-    print(f" Native Web Installer: {native_exe} ({os.path.getsize(native_exe) / 1024:.2f} KB)")
 print("==========================================================")

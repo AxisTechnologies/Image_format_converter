@@ -17,19 +17,14 @@ An enterprise-grade, high-performance Windows desktop application that continuou
 
 ---
 
-## 🚀 One-Click Easy Installation
+## 🚀 Download & Installation
 
-### Option 1: One-Click Web Setup Installer (Recommended)
-Download and run the self-contained installer:
-👉 **[Download PNG2JPEGConverter_Web_Setup.exe](https://github.com/AxisTechnologies/Image_format_converter/releases/latest/download/PNG2JPEGConverter_Web_Setup.exe)**
+### 1-Click Offline Setup Installer (Recommended)
+Download and run the standalone installer:
+👉 **[Download PNG2JPEGConverter_Installer.exe](https://github.com/AxisTechnologies/Image_format_converter/releases/latest/download/PNG2JPEGConverter_Installer.exe)**
 
-The installer automatically downloads application files, installs them to `%LOCALAPPDATA%\PNG2JPEGConverter`, creates a **Desktop Shortcut**, and launches the app.
-
-### Option 2: Portable Release Bundle
-Download the standalone zip package:
-👉 **[Download PNG2JPEGConverter_v1.0_Windows_Setup.zip](https://github.com/AxisTechnologies/Image_format_converter/releases/latest/download/PNG2JPEGConverter_v1.0_Windows_Setup.zip)**
-
-Extract and run `PNG2JPEGConverter.exe` directly on any 64-bit Windows PC (no installation or Python required).
+* **Self-Contained & Offline**: Includes all application dependencies inside a single setup executable.
+* **1-Click Installation**: Installs to `%LOCALAPPDATA%\PNG2JPEGConverter`, creates a **Desktop Shortcut**, and launches the app immediately.
 
 ---
 
